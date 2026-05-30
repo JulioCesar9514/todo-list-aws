@@ -50,5 +50,19 @@ pipeline {
                 }
             }
         }
+        stage('Unit Tests') {
+            steps {
+                sh '''
+                    echo "Activando entorno virtual"
+                    . venv/bin/activate
+        
+                    echo "Instalando pytest"
+                    pip install pytest
+        
+                    echo "Ejecutando pytest"
+                    pytest -q --disable-warnings --maxfail=1
+                '''
+            }
+        }
     }
 }
