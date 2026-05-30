@@ -1,0 +1,16 @@
+pipeline {
+    agent any
+
+    stages {
+    }
+}
+stage('Get Code') {
+    steps {
+        sh '''
+            echo "Verificando entorno"
+            git --version
+            ls -la
+        '''
+    }
+}
+
