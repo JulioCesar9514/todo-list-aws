@@ -64,5 +64,46 @@ pipeline {
                 '''
             }
         }
+        stage('Build SAM') {
+            when {
+                branch 'master'
+            }
+            steps {
+                sh '''
+                    echo "Construyendo aplicación con SAM"
+                    sam build
+                '''
+            }
+        }
+        
+        stage('Deploy SAM') {
+            when {
+                branch 'master'
+            }
+            steps {
+                sh '''
+                    echo "Desplegando aplicación con SAM"
+                    sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
+                '''
+            }
+        }
+        
+        stage('API Tests') {
+            when {
+                branch 'master'
+            }
+            steps {
+                sh '''
+                    echo "Ejecutando pruebas curl"
+                    API_URL=$(aws cloudformation describe-stacks --stack-name todo-list-aws --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" --output text)
+        
+                    echo "Probando endpoint GET /todos"
+                    curl -s $API_URL/todos
+        
+                    echo "Probando endpoint POST /todos"
+                    curl -s -X POST $API_URL/todos -d '{"task":"test"}' -H "Content-Type: application/json"
+                '''
+            }
+        }
     }
 }
