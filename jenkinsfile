@@ -18,16 +18,16 @@ pipeline {
                 sh '''
                     echo "Creando entorno virtual"
                     python3 -m venv venv
-
+        
                     echo "Activando entorno virtual"
                     . venv/bin/activate
-
+        
                     echo "Instalando dependencias"
-                    pip install flake8 bandit
-
+                    pip install flake8 bandit flake8-html
+        
                     echo "Ejecutando flake8"
                     flake8 src --format=html --htmldir=flake8-report || true
-
+        
                     echo "Ejecutando bandit"
                     bandit -r src -f html -o bandit-report.html || true
                 '''
