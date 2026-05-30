@@ -16,7 +16,13 @@ pipeline {
         stage('Static Test') {
             steps {
                 sh '''
-                    echo "Instalando dependencias de análisis estático"
+                    echo "Creando entorno virtual"
+                    python3 -m venv venv
+
+                    echo "Activando entorno virtual"
+                    . venv/bin/activate
+
+                    echo "Instalando dependencias"
                     pip install flake8 bandit
 
                     echo "Ejecutando flake8"
@@ -46,4 +52,3 @@ pipeline {
         }
     }
 }
-
