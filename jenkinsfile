@@ -2,6 +2,7 @@ pipeline {
     agent any
 
     stages {
+
         stage('Get Code') {
             steps {
                 sh '''
@@ -9,6 +10,38 @@ pipeline {
                     git --version
                     ls -la
                 '''
+            }
+        }
+
+        stage('Static Test') {
+            steps {
+                sh '''
+                    echo "Instalando dependencias de análisis estático"
+                    pip install flake8 bandit
+
+                    echo "Ejecutando flake8"
+                    flake8 src --format=html --htmldir=flake8-report || true
+
+                    echo "Ejecutando bandit"
+                    bandit -r src -f html -o bandit-report.html || true
+                '''
+            }
+
+            post {
+                always {
+                    echo "Publicando reportes"
+                    publishHTML(target: [
+                        reportDir: 'flake8-report',
+                        reportFiles: 'index.html',
+                        reportName: 'Flake8 Report'
+                    ])
+
+                    publishHTML(target: [
+                        reportDir: '.',
+                        reportFiles: 'bandit-report.html',
+                        reportName: 'Bandit Report'
+                    ])
+                }
             }
         }
     }
