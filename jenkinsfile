@@ -83,7 +83,8 @@ pipeline {
             steps {
                 sh '''
                     echo "Desplegando aplicación con SAM"
-                    sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
+                    // sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
+                    echo "Despliegu comentado"
                 '''
             }
         }
