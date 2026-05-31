@@ -95,13 +95,16 @@ pipeline {
             steps {
                 sh '''
                     echo "Ejecutando pruebas curl"
-                    API_URL=$(aws cloudformation describe-stacks --stack-name todo-list-aws --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" --output text)
         
-                    echo "Probando endpoint GET /todos"
+                    API_URL="https://7n8qiq9ut0.execute-api.us-east-1.amazonaws.com/Prod"
+        
+                    echo "Probando GET /todos"
                     curl -s $API_URL/todos
         
-                    echo "Probando endpoint POST /todos"
-                    curl -s -X POST $API_URL/todos -d '{"task":"test"}' -H "Content-Type: application/json"
+                    echo "Probando POST /todos"
+                    curl -s -X POST $API_URL/todos \
+                        -H "Content-Type: application/json" \
+                        -d '{"task":"test desde jenkins"}'
                 '''
             }
         }
