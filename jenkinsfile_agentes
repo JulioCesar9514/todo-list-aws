@@ -1,9 +1,10 @@
 pipeline {
-    agent any
+    agent none
 
     stages {
 
         stage('Get Code') {
+            agent any
             steps {
                 sh '''
                     echo "Verificando entorno"
@@ -14,28 +15,27 @@ pipeline {
         }
 
         stage('Static Test') {
+            agent { label 'static-node' }
             steps {
                 sh '''
                     echo "Creando entorno virtual"
                     python3 -m venv venv
-        
+
                     echo "Activando entorno virtual"
                     . venv/bin/activate
-        
+
                     echo "Instalando dependencias"
                     pip install flake8 bandit flake8-html
-        
+
                     echo "Ejecutando flake8"
                     flake8 src --format=html --htmldir=flake8-report || true
-        
+
                     echo "Ejecutando bandit"
                     bandit -r src -f html -o bandit-report.html || true
                 '''
             }
-
             post {
                 always {
-                    echo "Publicando reportes"
                     publishHTML(target: [
                         reportDir: 'flake8-report',
                         reportFiles: 'index.html',
@@ -50,24 +50,26 @@ pipeline {
                 }
             }
         }
+
         stage('Unit Tests') {
+            agent any
             steps {
                 sh '''
                     echo "Activando entorno virtual"
                     . venv/bin/activate
-        
+
                     echo "Instalando pytest"
                     pip install pytest
-        
+
                     echo "Ejecutando pytest"
                     pytest test/unit/TestToDo.py test/integration/todoApiTest.py -q --disable-warnings --maxfail=1 || true
                 '''
             }
         }
+
         stage('Build SAM') {
-            when {
-                branch 'master'
-            }
+            when { branch 'master' }
+            agent any
             steps {
                 sh '''
                     echo "Construyendo aplicación con SAM"
@@ -75,36 +77,33 @@ pipeline {
                 '''
             }
         }
-        
+
         stage('Deploy SAM') {
-            when {
-                branch 'master'
-            }
+            when { branch 'master' }
+            agent any
             steps {
                 sh '''
-                    echo "Desplegando aplicación con SAM"
-                    echo "Despliegu eliminado"
+                    echo "Despliegue eliminado (no se hace desde Jenkins en voclabs)"
                 '''
             }
         }
-        
+
         stage('API Tests') {
-            when {
-                branch 'master'
-            }
+            when { branch 'master' }
+            agent { label 'api-node' }
             steps {
                 sh '''
                     echo "Ejecutando pruebas curl"
-        
+
                     API_URL="https://7n8qiq9ut0.execute-api.us-east-1.amazonaws.com/Prod"
-        
+
                     echo "Probando GET /todos"
-                    curl -s $API_URL/todos
-        
+                    curl -s "$API_URL/todos"
+
                     echo "Probando POST /todos"
-                    curl -s -X POST $API_URL/todos \
+                    curl -s -X POST "$API_URL/todos" \
                         -H "Content-Type: application/json" \
-                        -d '{\"text\":\"test desde jenkins\"}'
+                        -d '{"text":"test desde jenkins"}'
                 '''
             }
         }
