@@ -2,12 +2,51 @@ pipeline {
     agent none
 
     stages {
+
         stage('Get Code') {
             agent any
             steps {
-                sh 'echo "Get Code OK"'
+                sh '''
+                    echo "Get Code OK"
+                    whoami
+                    hostname
+                '''
+            }
+        }
+
+        stage('Static Test') {
+            agent { label 'static-node' }
+            steps {
+                sh '''
+                    echo "=== STATIC TEST ==="
+                    whoami
+                    hostname
+
+                    python3 -m venv venv
+                    . venv/bin/activate
+
+                    pip install flake8 bandit flake8-html
+
+                    flake8 src --format=html --htmldir=flake8-report || true
+                    bandit -r src -f html -o bandit-report.html || true
+                '''
+            }
+
+            post {
+                always {
+                    publishHTML(target: [
+                        reportDir: 'flake8-report',
+                        reportFiles: 'index.html',
+                        reportName: 'Flake8 Report'
+                    ])
+
+                    publishHTML(target: [
+                        reportDir: '.',
+                        reportFiles: 'bandit-report.html',
+                        reportName: 'Bandit Report'
+                    ])
+                }
             }
         }
     }
 }
-# test cambio
