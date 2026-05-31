@@ -104,7 +104,7 @@ pipeline {
                     echo "Probando POST /todos"
                     curl -s -X POST $API_URL/todos \
                         -H "Content-Type: application/json" \
-                        -d '{\"task\":\"test desde jenkins\"}'
+                        -d '{\"text\":\"test desde jenkins\"}'
                 '''
             }
         }
