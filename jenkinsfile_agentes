@@ -60,7 +60,7 @@ pipeline {
                     python3 -m venv venv
                     . venv/bin/activate
 
-                    pip install pytest boto3
+                    pip install pytest boto3 moto
 
                     pytest test/unit/TestToDo.py -q --disable-warnings --maxfail=1 || true
                 '''
