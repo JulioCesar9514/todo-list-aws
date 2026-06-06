@@ -27,8 +27,8 @@ pipeline {
 
                     pip install flake8 bandit flake8-html
 
-                    flake8 src --format=html --htmldir=flake8-report || true
-                    bandit -r src -f html -o bandit-report.html || true
+                    flake8 src --format=html --htmldir=flake8-report
+                    bandit -r src -f html -o bandit-report.html
                 '''
             }
 
@@ -60,7 +60,7 @@ pipeline {
                     python3 -m venv venv
                     . venv/bin/activate
 
-                    pip install pytest
+                    pip install pytest boto3
 
                     pytest test/unit/TestToDo.py -q --disable-warnings --maxfail=1 || true
                 '''
@@ -68,9 +68,6 @@ pipeline {
         }
 
         stage('Build SAM') {
-            when {
-                branch 'develop'
-            }
             agent { label 'api-node' }
             steps {
                 sh '''
@@ -84,9 +81,6 @@ pipeline {
         }
 
         stage('Deploy SAM') {
-            when {
-                branch 'develop'
-            }
             agent { label 'api-node' }
             steps {
                 sh '''
@@ -98,5 +92,49 @@ pipeline {
                 '''
             }
         }
+
+        stage('Get BaseURL') {
+            agent { label 'api-node' }
+            steps {
+                sh '''
+                    echo "=== GET BASEURL ==="
+
+                    BASEURL=$(aws cloudformation describe-stacks \
+                        --stack-name staging-todo-list-aws \
+                        --query "Stacks[0].Outputs[?OutputKey=='BaseUrlApi'].OutputValue" \
+                        --output text)
+
+                    echo "$BASEURL" > baseurl.txt
+                '''
+
+                stash includes: 'baseurl.txt', name: 'baseurl'
+            }
+        }
+
+        stage('REST Tests') {
+            agent { label 'api-node' }
+            steps {
+                unstash 'baseurl'
+
+                sh '''
+                    echo "=== REST TESTS ==="
+                    whoami
+                    hostname
+
+                    BASEURL=$(cat baseurl.txt)
+                    echo "BaseURL: $BASEURL"
+
+                    python3 -m venv venv
+                    . venv/bin/activate
+
+                    pip install pytest requests
+
+                    export BASEURL=$BASEURL
+
+                    pytest test/rest/toDoApiTest.py -q --disable-warnings --maxfail=1
+                '''
+            }
+        }
+
     }
 }
