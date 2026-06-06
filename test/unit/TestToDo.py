@@ -7,7 +7,6 @@ import sys
 import os
 import json
 
-# Añadir ruta raíz del proyecto al PYTHONPATH
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 @mock_aws
@@ -32,6 +31,7 @@ class TestDatabaseFunctions(unittest.TestCase):
         self.is_local = 'true'
         self.uuid = "123e4567-e89b-12d3-a456-426614174000"
         self.text = "Aprender DevOps y Cloud en la UNIR"
+        os.environ['DYNAMODB_TABLE'] = 'ToDoTable'
 
         from src.todoList import create_todo_table
         self.table = create_todo_table(self.dynamodb)
