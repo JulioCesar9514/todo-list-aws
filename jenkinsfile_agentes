@@ -1,11 +1,18 @@
 pipeline {
     agent none
 
+    options {
+        // Evita que Jenkins haga checkout automático en cada stage
+        skipDefaultCheckout(true)
+    }
+
     stages {
 
         stage('Get Code') {
             agent any
             steps {
+                checkout scm
+
                 sh '''
                     echo "=== GET CODE ==="
                     whoami
@@ -35,10 +42,10 @@ pipeline {
         stage('Static Test') {
             agent { label 'static-node' }
             steps {
+                checkout scm
+
                 sh '''
                     echo "=== STATIC TEST ==="
-                    whoami
-                    hostname
 
                     python3 -m venv venv
                     . venv/bin/activate
@@ -70,10 +77,10 @@ pipeline {
         stage('Unit Tests') {
             agent any
             steps {
+                checkout scm
+
                 sh '''
                     echo "=== UNIT TESTS ==="
-                    whoami
-                    hostname
 
                     python3 -m venv venv
                     . venv/bin/activate
@@ -88,11 +95,10 @@ pipeline {
         stage('Build SAM') {
             agent { label 'api-node' }
             steps {
+                checkout scm
+
                 sh '''
                     echo "=== BUILD SAM ==="
-                    whoami
-                    hostname
-
                     sam build
                 '''
             }
@@ -101,10 +107,17 @@ pipeline {
         stage('Deploy SAM') {
             agent { label 'api-node' }
             steps {
+                checkout scm
+
                 sh '''
                     echo "=== DEPLOY SAM ==="
-                    whoami
-                    hostname
+
+                    # DESCARGAR DE NUEVO EL SAMCONFIG (porque Jenkins borra el workspace)
+                    if [ "$BRANCH_NAME" = "master" ]; then
+                        curl -o samconfig.toml https://raw.githubusercontent.com/JulioCesar9514/todo-list-aws-config/production/samconfig.toml
+                    else
+                        curl -o samconfig.toml https://raw.githubusercontent.com/JulioCesar9514/todo-list-aws-config/staging/samconfig.toml
+                    fi
 
                     sam deploy --no-fail-on-empty-changeset
                 '''
@@ -114,28 +127,48 @@ pipeline {
         stage('Get BaseURL') {
             agent { label 'api-node' }
             steps {
-                sh '''
-                    echo "=== GET BASEURL ==="
+                checkout scm
 
-                    BASEURL=$(aws cloudformation describe-stacks \
-                        --stack-name staging-todo-list-aws \
-                        --query "Stacks[0].Outputs[?OutputKey=='BaseUrlApi'].OutputValue" \
-                        --output text)
+                script {
+                    def stackName = (env.BRANCH_NAME == "master") 
+                        ? "production-todo-list-aws"
+                        : "staging-todo-list-aws"
 
-                    echo "$BASEURL" > baseurl.txt
-                '''
+                    sh """
+                        echo "=== GET BASEURL ==="
+                        BASEURL=\$(aws cloudformation describe-stacks \
+                            --stack-name ${stackName} \
+                            --query "Stacks[0].Outputs[?OutputKey=='BaseUrlApi'].OutputValue" \
+                            --output text)
+                        echo "\$BASEURL" > baseurl.txt
+                    """
+                }
 
                 stash includes: 'baseurl.txt', name: 'baseurl'
             }
         }
 
         stage('REST Tests') {
-            when {
-                expression { env.BRANCH_NAME == "master" }
-            }
             agent { label 'api-node' }
             steps {
-                echo "REST Tests solo se ejecutan en master. Saltando en develop."
+                checkout scm
+                unstash 'baseurl'
+
+                sh '''
+                    echo "=== REST TESTS ==="
+
+                    BASEURL=$(cat baseurl.txt)
+                    echo "BaseURL: $BASEURL"
+
+                    python3 -m venv venv
+                    . venv/bin/activate
+
+                    pip install pytest requests
+
+                    export BASE_URL=$BASEURL
+
+                    pytest test/integration/todoApiTest.py -q --disable-warnings --maxfail=1
+                '''
             }
         }
 
