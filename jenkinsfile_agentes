@@ -7,10 +7,28 @@ pipeline {
             agent any
             steps {
                 sh '''
-                    echo "Verificando entorno"
-                    git --version
-                    ls -la
+                    echo "=== GET CODE ==="
+                    whoami
+                    hostname
                 '''
+
+                script {
+                    if (env.BRANCH_NAME == "develop") {
+                        echo "Rama detectada: develop → usando configuración STAGING"
+                        sh '''
+                            curl -o samconfig.toml \
+                            https://raw.githubusercontent.com/JulioCesar9514/todo-list-aws-config/staging/samconfig.toml
+                        '''
+                    } else if (env.BRANCH_NAME == "master") {
+                        echo "Rama detectada: master → usando configuración PRODUCTION"
+                        sh '''
+                            curl -o samconfig.toml \
+                            https://raw.githubusercontent.com/JulioCesar9514/todo-list-aws-config/production/samconfig.toml
+                        '''
+                    } else {
+                        error "Rama no soportada para este pipeline (solo develop y master)"
+                    }
+                }
             }
         }
 
@@ -18,22 +36,20 @@ pipeline {
             agent { label 'static-node' }
             steps {
                 sh '''
-                    echo "Creando entorno virtual"
-                    python3 -m venv venv
+                    echo "=== STATIC TEST ==="
+                    whoami
+                    hostname
 
-                    echo "Activando entorno virtual"
+                    python3 -m venv venv
                     . venv/bin/activate
 
-                    echo "Instalando dependencias"
                     pip install flake8 bandit flake8-html
 
-                    echo "Ejecutando flake8"
-                    flake8 src --format=html --htmldir=flake8-report || true
-
-                    echo "Ejecutando bandit"
-                    bandit -r src -f html -o bandit-report.html || true
+                    flake8 src --format=html --htmldir=flake8-report
+                    bandit -r src -f html -o bandit-report.html
                 '''
             }
+
             post {
                 always {
                     publishHTML(target: [
@@ -55,57 +71,88 @@ pipeline {
             agent any
             steps {
                 sh '''
-                    echo "Activando entorno virtual"
+                    echo "=== UNIT TESTS ==="
+                    whoami
+                    hostname
+
+                    python3 -m venv venv
                     . venv/bin/activate
 
-                    echo "Instalando pytest"
-                    pip install pytest
+                    pip install pytest boto3 moto
 
-                    echo "Ejecutando pytest"
-                    pytest test/unit/TestToDo.py test/integration/todoApiTest.py -q --disable-warnings --maxfail=1 || true
+                    pytest test/unit/TestToDo.py -q --disable-warnings --maxfail=1 || true
                 '''
             }
         }
 
         stage('Build SAM') {
-            when { branch 'master' }
-            agent any
+            agent { label 'api-node' }
             steps {
                 sh '''
-                    echo "Construyendo aplicación con SAM"
+                    echo "=== BUILD SAM ==="
+                    whoami
+                    hostname
+
                     sam build
                 '''
             }
         }
 
         stage('Deploy SAM') {
-            when { branch 'master' }
-            agent any
-            steps {
-                sh '''
-                    echo "Despliegue eliminado (no se hace desde Jenkins en voclabs)"
-                '''
-            }
-        }
-
-        stage('API Tests') {
-            when { branch 'master' }
             agent { label 'api-node' }
             steps {
                 sh '''
-                    echo "Ejecutando pruebas curl"
+                    echo "=== DEPLOY SAM ==="
+                    whoami
+                    hostname
 
-                    API_URL="https://7n8qiq9ut0.execute-api.us-east-1.amazonaws.com/Prod"
-
-                    echo "Probando GET /todos"
-                    curl -s "$API_URL/todos"
-
-                    echo "Probando POST /todos"
-                    curl -s -X POST "$API_URL/todos" \
-                        -H "Content-Type: application/json" \
-                        -d '{"text":"test desde jenkins"}'
+                    sam deploy
                 '''
             }
         }
+
+        stage('Get BaseURL') {
+            agent { label 'api-node' }
+            steps {
+                sh '''
+                    echo "=== GET BASEURL ==="
+
+                    BASEURL=$(aws cloudformation describe-stacks \
+                        --stack-name staging-todo-list-aws \
+                        --query "Stacks[0].Outputs[?OutputKey=='BaseUrlApi'].OutputValue" \
+                        --output text)
+
+                    echo "$BASEURL" > baseurl.txt
+                '''
+
+                stash includes: 'baseurl.txt', name: 'baseurl'
+            }
+        }
+
+        stage('REST Tests') {
+            agent { label 'api-node' }
+            steps {
+                unstash 'baseurl'
+
+                sh '''
+                    echo "=== REST TESTS ==="
+                    whoami
+                    hostname
+
+                    BASEURL=$(cat baseurl.txt)
+                    echo "BaseURL: $BASEURL"
+
+                    python3 -m venv venv
+                    . venv/bin/activate
+
+                    pip install pytest requests
+
+                    export BASEURL=$BASEURL
+
+                    pytest test/rest/toDoApiTest.py -q --disable-warnings --maxfail=1
+                '''
+            }
+        }
+
     }
 }
