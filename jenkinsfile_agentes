@@ -167,7 +167,7 @@ pipeline {
 
                     export BASEURL=$BASEURL
 
-                    pytest test/rest/toDoApiTest.py -q --disable-warnings --maxfail=1
+                    pytest test/integration -q --disable-warnings --maxfail=1
                 '''
             }
         }
