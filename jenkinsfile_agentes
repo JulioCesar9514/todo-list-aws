@@ -1,18 +1,24 @@
 pipeline {
     agent none
 
+    options {
+        // Evita que Jenkins haga checkout automático en cada stage
+        skipDefaultCheckout(true)
+    }
+
     stages {
 
         stage('Get Code') {
             agent any
             steps {
+                checkout scm
+
                 sh '''
                     echo "=== GET CODE ==="
                     whoami
                     hostname
                 '''
 
-                // DESCARGAR SAMCONFIG SEGÚN LA RAMA
                 script {
                     if (env.BRANCH_NAME == "develop") {
                         echo "Rama detectada: develop → usando configuración STAGING"
@@ -36,15 +42,21 @@ pipeline {
         stage('Static Test') {
             agent { label 'static-node' }
             steps {
+                checkout scm
+
                 sh '''
                     echo "=== STATIC TEST ==="
+
                     python3 -m venv venv
                     . venv/bin/activate
+
                     pip install flake8 bandit flake8-html
+
                     flake8 src --format=html --htmldir=flake8-report
                     bandit -r src -f html -o bandit-report.html
                 '''
             }
+
             post {
                 always {
                     publishHTML(target: [
@@ -52,6 +64,7 @@ pipeline {
                         reportFiles: 'index.html',
                         reportName: 'Flake8 Report'
                     ])
+
                     publishHTML(target: [
                         reportDir: '.',
                         reportFiles: 'bandit-report.html',
@@ -64,11 +77,16 @@ pipeline {
         stage('Unit Tests') {
             agent any
             steps {
+                checkout scm
+
                 sh '''
                     echo "=== UNIT TESTS ==="
+
                     python3 -m venv venv
                     . venv/bin/activate
+
                     pip install pytest boto3 moto
+
                     pytest test/unit/TestToDo.py -q --disable-warnings --maxfail=1 || true
                 '''
             }
@@ -77,6 +95,8 @@ pipeline {
         stage('Build SAM') {
             agent { label 'api-node' }
             steps {
+                checkout scm
+
                 sh '''
                     echo "=== BUILD SAM ==="
                     sam build
@@ -87,13 +107,18 @@ pipeline {
         stage('Deploy SAM') {
             agent { label 'api-node' }
             steps {
+                checkout scm
+
                 sh '''
                     echo "=== DEPLOY SAM ==="
 
-                    # BORRAR CUALQUIER SAMCONFIG ANTIGUO DEL WORKSPACE
-                    rm -f .aws-sam/samconfig.toml || true
+                    # DESCARGAR DE NUEVO EL SAMCONFIG (porque Jenkins borra el workspace)
+                    if [ "$BRANCH_NAME" = "master" ]; then
+                        curl -o samconfig.toml https://raw.githubusercontent.com/JulioCesar9514/todo-list-aws-config/production/samconfig.toml
+                    else
+                        curl -o samconfig.toml https://raw.githubusercontent.com/JulioCesar9514/todo-list-aws-config/staging/samconfig.toml
+                    fi
 
-                    # USAR EL QUE DESCARGAMOS EN GET CODE
                     sam deploy --no-fail-on-empty-changeset
                 '''
             }
@@ -102,6 +127,8 @@ pipeline {
         stage('Get BaseURL') {
             agent { label 'api-node' }
             steps {
+                checkout scm
+
                 script {
                     def stackName = (env.BRANCH_NAME == "master") 
                         ? "production-todo-list-aws"
@@ -116,6 +143,7 @@ pipeline {
                         echo "\$BASEURL" > baseurl.txt
                     """
                 }
+
                 stash includes: 'baseurl.txt', name: 'baseurl'
             }
         }
@@ -123,17 +151,26 @@ pipeline {
         stage('REST Tests') {
             agent { label 'api-node' }
             steps {
+                checkout scm
                 unstash 'baseurl'
+
                 sh '''
                     echo "=== REST TESTS ==="
+
                     BASEURL=$(cat baseurl.txt)
+                    echo "BaseURL: $BASEURL"
+
                     python3 -m venv venv
                     . venv/bin/activate
+
                     pip install pytest requests
+
                     export BASEURL=$BASEURL
+
                     pytest test/rest/toDoApiTest.py -q --disable-warnings --maxfail=1
                 '''
             }
         }
+
     }
 }
