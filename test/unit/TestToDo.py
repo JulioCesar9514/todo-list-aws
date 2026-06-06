@@ -7,6 +7,9 @@ import sys
 import os
 import json
 
+# Añadir ruta raíz del proyecto al PYTHONPATH
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+
 @mock_aws
 class TestDatabaseFunctions(unittest.TestCase):
     def setUp(self):
