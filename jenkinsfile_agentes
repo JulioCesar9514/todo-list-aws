@@ -12,6 +12,7 @@ pipeline {
                     hostname
                 '''
 
+                // DESCARGAR SAMCONFIG SEGÚN LA RAMA
                 script {
                     if (env.BRANCH_NAME == "develop") {
                         echo "Rama detectada: develop → usando configuración STAGING"
@@ -37,19 +38,13 @@ pipeline {
             steps {
                 sh '''
                     echo "=== STATIC TEST ==="
-                    whoami
-                    hostname
-
                     python3 -m venv venv
                     . venv/bin/activate
-
                     pip install flake8 bandit flake8-html
-
                     flake8 src --format=html --htmldir=flake8-report
                     bandit -r src -f html -o bandit-report.html
                 '''
             }
-
             post {
                 always {
                     publishHTML(target: [
@@ -57,7 +52,6 @@ pipeline {
                         reportFiles: 'index.html',
                         reportName: 'Flake8 Report'
                     ])
-
                     publishHTML(target: [
                         reportDir: '.',
                         reportFiles: 'bandit-report.html',
@@ -72,14 +66,9 @@ pipeline {
             steps {
                 sh '''
                     echo "=== UNIT TESTS ==="
-                    whoami
-                    hostname
-
                     python3 -m venv venv
                     . venv/bin/activate
-
                     pip install pytest boto3 moto
-
                     pytest test/unit/TestToDo.py -q --disable-warnings --maxfail=1 || true
                 '''
             }
@@ -90,9 +79,6 @@ pipeline {
             steps {
                 sh '''
                     echo "=== BUILD SAM ==="
-                    whoami
-                    hostname
-
                     sam build
                 '''
             }
@@ -103,9 +89,11 @@ pipeline {
             steps {
                 sh '''
                     echo "=== DEPLOY SAM ==="
-                    whoami
-                    hostname
 
+                    # BORRAR CUALQUIER SAMCONFIG ANTIGUO DEL WORKSPACE
+                    rm -f .aws-sam/samconfig.toml || true
+
+                    # USAR EL QUE DESCARGAMOS EN GET CODE
                     sam deploy --no-fail-on-empty-changeset
                 '''
             }
@@ -114,17 +102,20 @@ pipeline {
         stage('Get BaseURL') {
             agent { label 'api-node' }
             steps {
-                sh '''
-                    echo "=== GET BASEURL ==="
+                script {
+                    def stackName = (env.BRANCH_NAME == "master") 
+                        ? "production-todo-list-aws"
+                        : "staging-todo-list-aws"
 
-                    BASEURL=$(aws cloudformation describe-stacks \
-                        --stack-name staging-todo-list-aws \
-                        --query "Stacks[0].Outputs[?OutputKey=='BaseUrlApi'].OutputValue" \
-                        --output text)
-
-                    echo "$BASEURL" > baseurl.txt
-                '''
-
+                    sh """
+                        echo "=== GET BASEURL ==="
+                        BASEURL=\$(aws cloudformation describe-stacks \
+                            --stack-name ${stackName} \
+                            --query "Stacks[0].Outputs[?OutputKey=='BaseUrlApi'].OutputValue" \
+                            --output text)
+                        echo "\$BASEURL" > baseurl.txt
+                    """
+                }
                 stash includes: 'baseurl.txt', name: 'baseurl'
             }
         }
@@ -133,26 +124,16 @@ pipeline {
             agent { label 'api-node' }
             steps {
                 unstash 'baseurl'
-
                 sh '''
                     echo "=== REST TESTS ==="
-                    whoami
-                    hostname
-
                     BASEURL=$(cat baseurl.txt)
-                    echo "BaseURL: $BASEURL"
-
                     python3 -m venv venv
                     . venv/bin/activate
-
                     pip install pytest requests
-
                     export BASEURL=$BASEURL
-
                     pytest test/rest/toDoApiTest.py -q --disable-warnings --maxfail=1
                 '''
             }
         }
-
     }
 }
