@@ -165,7 +165,7 @@ pipeline {
 
                     pip install pytest requests
 
-                    export BASEURL=$BASEURL
+                    export BASE_URL=$BASEURL
 
                     pytest test/integration/todoApiTest.py -q --disable-warnings --maxfail=1
                 '''
