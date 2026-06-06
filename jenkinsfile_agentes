@@ -7,10 +7,28 @@ pipeline {
             agent any
             steps {
                 sh '''
-                    echo "Get Code OK"
+                    echo "=== GET CODE ==="
                     whoami
                     hostname
                 '''
+
+                script {
+                    if (env.BRANCH_NAME == "develop") {
+                        echo "Rama detectada: develop → usando configuración STAGING"
+                        sh '''
+                            curl -o samconfig.toml \
+                            https://raw.githubusercontent.com/JulioCesar9514/todo-list-aws-config/staging/samconfig.toml
+                        '''
+                    } else if (env.BRANCH_NAME == "master") {
+                        echo "Rama detectada: master → usando configuración PRODUCTION"
+                        sh '''
+                            curl -o samconfig.toml \
+                            https://raw.githubusercontent.com/JulioCesar9514/todo-list-aws-config/production/samconfig.toml
+                        '''
+                    } else {
+                        error "Rama no soportada para este pipeline (solo develop y master)"
+                    }
+                }
             }
         }
 
