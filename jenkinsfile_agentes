@@ -106,7 +106,7 @@ pipeline {
                     whoami
                     hostname
 
-                    sam deploy
+                    sam deploy --no-fail-on-empty-changeset
                 '''
             }
         }
