@@ -48,5 +48,21 @@ pipeline {
                 }
             }
         }
+
+        stage('Unit Tests') {
+            agent any
+            steps {
+                sh '''
+                    echo "=== UNIT TESTS ==="
+                    whoami
+                    hostname
+
+                    . venv/bin/activate
+                    pip install pytest
+
+                    pytest test/unit/TestToDo.py -q --disable-warnings --maxfail=1 || true
+                '''
+            }
+        }
     }
 }
