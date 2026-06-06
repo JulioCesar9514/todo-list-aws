@@ -57,7 +57,6 @@ pipeline {
                     whoami
                     hostname
 
-                    # Crear entorno virtual en este agente
                     python3 -m venv venv
                     . venv/bin/activate
 
@@ -72,7 +71,7 @@ pipeline {
             when {
                 branch 'develop'
             }
-            agent any
+            agent { label 'api-node' }
             steps {
                 sh '''
                     echo "=== BUILD SAM ==="
@@ -80,6 +79,22 @@ pipeline {
                     hostname
 
                     sam build
+                '''
+            }
+        }
+
+        stage('Deploy SAM') {
+            when {
+                branch 'develop'
+            }
+            agent { label 'api-node' }
+            steps {
+                sh '''
+                    echo "=== DEPLOY SAM ==="
+                    whoami
+                    hostname
+
+                    sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
                 '''
             }
         }
