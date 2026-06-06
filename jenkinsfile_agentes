@@ -130,14 +130,14 @@ pipeline {
         }
 
         stage('REST Tests') {
-           stage('REST Tests') {
-                when {
-                    expression { env.BRANCH_NAME == "master" }
-                }
-                agent { label 'api-node' }
-                steps {
-                    echo "REST Tests solo se ejecutan en master. Saltando en develop."
-                }
+            when {
+                expression { env.BRANCH_NAME == "master" }
             }
+            agent { label 'api-node' }
+            steps {
+                echo "REST Tests solo se ejecutan en master. Saltando en develop."
+            }
+        }
+
     }
 }
