@@ -67,5 +67,21 @@ pipeline {
                 '''
             }
         }
+
+        stage('Build SAM') {
+            when {
+                branch 'develop'
+            }
+            agent any
+            steps {
+                sh '''
+                    echo "=== BUILD SAM ==="
+                    whoami
+                    hostname
+
+                    sam build
+                '''
+            }
+        }
     }
 }
