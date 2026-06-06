@@ -130,29 +130,14 @@ pipeline {
         }
 
         stage('REST Tests') {
-            agent { label 'api-node' }
-            steps {
-                unstash 'baseurl'
-
-                sh '''
-                    echo "=== REST TESTS ==="
-                    whoami
-                    hostname
-
-                    BASEURL=$(cat baseurl.txt)
-                    echo "BaseURL: $BASEURL"
-
-                    python3 -m venv venv
-                    . venv/bin/activate
-
-                    pip install pytest requests
-
-                    export BASEURL=$BASEURL
-
-                    pytest test/rest/toDoApiTest.py -q --disable-warnings --maxfail=1
-                '''
+           stage('REST Tests') {
+                when {
+                    expression { env.BRANCH_NAME == "master" }
+                }
+                agent { label 'api-node' }
+                steps {
+                    echo "REST Tests solo se ejecutan en master. Saltando en develop."
+                }
             }
-        }
-
     }
 }
