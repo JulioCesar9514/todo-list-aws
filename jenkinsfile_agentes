@@ -94,7 +94,7 @@ pipeline {
                     whoami
                     hostname
 
-                    sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
+                    sam deploy
                 '''
             }
         }
